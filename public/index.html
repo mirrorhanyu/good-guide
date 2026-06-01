@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>goodguide</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">👆 goodguide</div>
+    <div class="spacer"></div>
+    <span id="saveStatus" class="save-status">已保存</span>
+    <button id="exportBtn" class="primary">一键导出全部 mp4</button>
+  </header>
+
+  <div id="layout">
+    <!-- LEFT: image list -->
+    <aside id="sidebar">
+      <div class="panel-title">图片 <span id="imgCount"></span></div>
+      <ul id="imageList"></ul>
+      <div class="hint">拖动可排序</div>
+    </aside>
+
+    <!-- CENTER: stage -->
+    <main id="stageWrap">
+      <div id="stageInner">
+        <canvas id="stage"></canvas>
+      </div>
+      <div id="stageEmpty" class="empty">请选择左侧的一张图片</div>
+    </main>
+
+    <!-- RIGHT: properties -->
+    <aside id="inspector">
+      <div class="panel-title">标注</div>
+      <div class="row btns">
+        <button id="addHand">+ 小手</button>
+        <button id="addBox">+ 框框</button>
+      </div>
+
+      <div id="annProps" class="props hidden">
+        <div class="prop-head">
+          <span id="annKind"></span>
+          <button id="deleteAnn" class="danger small">删除</button>
+        </div>
+        <label class="ctl"><span>颜色</span><input type="color" id="annColor" /></label>
+        <label class="ctl"><span>旋转 <em id="rotVal"></em></span>
+          <input type="range" id="annRot" min="-180" max="180" step="1" /></label>
+
+        <!-- hand-only -->
+        <div data-only="hand">
+          <label class="ctl"><span>大小 <em id="scaleVal"></em></span>
+            <input type="range" id="annScale" min="0.2" max="3" step="0.01" /></label>
+          <label class="ctl"><span>戳动距离 <em id="pokeVal"></em></span>
+            <input type="range" id="annPoke" min="0" max="200" step="1" /></label>
+        </div>
+
+        <!-- box-only -->
+        <div data-only="box">
+          <label class="ctl"><span>宽 <em id="wVal"></em></span>
+            <input type="range" id="annW" min="20" max="1080" step="1" /></label>
+          <label class="ctl"><span>高 <em id="hVal"></em></span>
+            <input type="range" id="annH" min="20" max="1920" step="1" /></label>
+          <label class="ctl"><span>线宽 <em id="lwVal"></em></span>
+            <input type="range" id="annLW" min="1" max="40" step="1" /></label>
+          <label class="ctl"><span>圆角 <em id="radVal"></em></span>
+            <input type="range" id="annRad" min="0" max="120" step="1" /></label>
+          <label class="ctl"><span>脉冲 <em id="pulseVal"></em></span>
+            <input type="range" id="annPulse" min="0" max="0.3" step="0.005" /></label>
+        </div>
+      </div>
+
+      <div class="panel-title">全局设置</div>
+      <div class="props">
+        <label class="ctl"><span>时长(秒) <em id="durVal"></em></span>
+          <input type="range" id="gDur" min="1" max="20" step="0.5" /></label>
+        <label class="ctl"><span>帧率</span>
+          <select id="gFps"><option>24</option><option>30</option><option>60</option></select></label>
+        <label class="ctl"><span>动画周期(秒) <em id="loopVal"></em></span>
+          <input type="range" id="gLoop" min="0.6" max="3" step="0.1" /></label>
+        <label class="ctl"><span>适配</span>
+          <select id="gFit"><option value="contain">完整显示</option><option value="cover">铺满裁切</option></select></label>
+        <label class="ctl"><span>背景</span>
+          <select id="gBgMode"><option value="blur">模糊底图</option><option value="color">纯色</option></select></label>
+        <label class="ctl" data-bg="color"><span>背景色</span><input type="color" id="gBgColor" /></label>
+        <label class="ctl" data-bg="blur"><span>模糊度 <em id="blurVal"></em></span>
+          <input type="range" id="gBlur" min="0" max="80" step="1" /></label>
+      </div>
+    </aside>
+  </div>
+
+  <!-- export overlay -->
+  <div id="exportOverlay" class="overlay hidden">
+    <div class="modal">
+      <h3>导出中…</h3>
+      <div id="exportLog" class="log"></div>
+      <div class="row end"><button id="exportClose" class="hidden">关闭</button></div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

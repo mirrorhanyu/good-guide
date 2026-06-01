@@ -1,0 +1,5 @@
+node_modules/
+goodguide-out/
+testshots/
+*.log
+.DS_Store

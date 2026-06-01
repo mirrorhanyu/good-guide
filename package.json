@@ -1,0 +1,20 @@
+{
+  "name": "good-guide",
+  "version": "0.1.0",
+  "description": "CLI + browser editor to annotate images with an animated pointing hand and highlight boxes, then export each image to its own looping mp4.",
+  "type": "module",
+  "bin": {
+    "good-guide": "bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "express": "^4.19.2",
+    "open": "^10.1.0"
+  }
+}
