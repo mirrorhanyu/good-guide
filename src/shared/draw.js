@@ -16,7 +16,7 @@ export const DEFAULTS = {
   loopPeriod: 1.3, // seconds per poke/pulse cycle
   background: { mode: "blur", color: "#101014", blur: 40, scrim: 0.35 },
   fit: "contain",
-  hand: { rotation: 0, scale: 1, fill: "#ffd9b3", outline: "#5a3b22", pokeDistance: 70 },
+  hand: { rotation: 0, scale: 1, fill: "#ffce9e", outline: "#6b4226", pokeDistance: 70 },
   box: { rotation: 0, stroke: "#ff3b30", lineWidth: 10, radius: 24, pulse: 0.06 },
 };
 

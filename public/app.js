@@ -1,5 +1,5 @@
 import { drawBase, drawAnnotations, DEFAULTS, HAND_BASE_HEIGHT } from "/shared/draw.js";
-import { HAND_VIEWBOX, HAND_ANCHOR } from "/shared/hand.js";
+import { HAND_VIEWBOX, HAND_ANCHOR, HAND_BBOX } from "/shared/hand.js";
 
 // ---------- state ----------
 let scene = null;
@@ -146,7 +146,7 @@ function localBox(a) {
   if (a.type === "box") return { minx: -a.w / 2, miny: -a.h / 2, maxx: a.w / 2, maxy: a.h / 2 };
   const s = (a.scale ?? 1) * (HAND_BASE_HEIGHT / HAND_VIEWBOX.h);
   const ax = HAND_ANCHOR.x * HAND_VIEWBOX.w, ay = HAND_ANCHOR.y * HAND_VIEWBOX.h;
-  return { minx: (14 - ax) * s, maxx: (108 - ax) * s, miny: (6 - ay) * s, maxy: (168 - ay) * s };
+  return { minx: (HAND_BBOX.minx - ax) * s, maxx: (HAND_BBOX.maxx - ax) * s, miny: (HAND_BBOX.miny - ay) * s, maxy: (HAND_BBOX.maxy - ay) * s };
 }
 function toLocal(a, px, py) {
   const dx = px - a.x, dy = py - a.y, c = Math.cos(rad(a.rotation || 0)), s = Math.sin(rad(a.rotation || 0));
@@ -267,10 +267,22 @@ function addAnn(a) {
   selAnnId = a.id;
   buildList(); refreshInspector(); markDirty();
 }
-$("deleteAnn").addEventListener("click", () => {
-  const im = curImage(); if (!im) return;
+function deleteSelected() {
+  const im = curImage();
+  if (!im || !selAnnId) return;
   im.annotations = im.annotations.filter((x) => x.id !== selAnnId);
   selAnnId = null; buildList(); refreshInspector(); markDirty();
+}
+$("deleteAnn").addEventListener("click", deleteSelected);
+
+// keyboard: Delete / Backspace removes the selected annotation
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Delete" && e.key !== "Backspace") return;
+  const el = document.activeElement;
+  if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return; // don't hijack form fields
+  if (!selAnnId) return;
+  e.preventDefault();
+  deleteSelected();
 });
 
 // ---------- inspector binding ----------
