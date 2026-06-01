@@ -23,6 +23,16 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "a" + Math.random()
 const curImage = () => (scene?.images || []).find((im) => im.id === selImageId) || null;
 const curAnn = () => (curImage()?.annotations || []).find((a) => a.id === selAnnId) || null;
 
+// paint the "filled" portion of a range slider with the accent colour
+function paintRange(el) {
+  const min = +el.min || 0, max = +el.max || 100, v = +el.value;
+  const pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
+  el.style.background = `linear-gradient(90deg, #5b8cff 0%, #9a6cff ${pct}%, var(--card-2) ${pct}%)`;
+}
+document.addEventListener("input", (e) => {
+  if (e.target.matches('input[type="range"]')) paintRange(e.target);
+}, true);
+
 // ---------- boot ----------
 init();
 async function init() {
@@ -291,7 +301,7 @@ function buildSubCount() {
   document.querySelectorAll(`.img-item[data-id="${im.id}"] .sub`).forEach((el) => el.textContent = `${im.annotations.length} 个标注`);
 }
 function setVal(id, v) { $(id).value = v; }
-function setRange(id, labelId, v, unit, dp = 0) { $(id).value = v; if (labelId) $(labelId).textContent = (dp ? Number(v).toFixed(dp) : Math.round(v)) + (unit || ""); }
+function setRange(id, labelId, v, unit, dp = 0) { const el = $(id); el.value = v; paintRange(el); if (labelId) $(labelId).textContent = (dp ? Number(v).toFixed(dp) : Math.round(v)) + (unit || ""); }
 
 function bindAnn(id, labelId, prop, unit, dp) {
   $(id).addEventListener("input", (e) => {
