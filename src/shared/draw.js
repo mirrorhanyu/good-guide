@@ -15,8 +15,8 @@ export const DEFAULTS = {
   loopPeriod: 1.3, // seconds per poke/pulse cycle
   background: { mode: "blur", color: "#101014", blur: 40, scrim: 0.35 },
   fit: "contain",
-  hand: { rotation: 0, scale: 1, fill: "#1b1b1f", pokeDistance: 70 },
-  box: { rotation: 0, stroke: "#ff3b30", lineWidth: 10, radius: 24, pulse: 0.06 },
+  hand: { rotation: 0, scale: 1, fill: "#ffccd5", pokeDistance: 70 },
+  box: { rotation: 0, stroke: "#687dfe", lineWidth: 10, radius: 24, pulse: 0.06 },
 };
 
 const deg2rad = (d) => (d * Math.PI) / 180;
@@ -118,7 +118,13 @@ export function drawHand(ctx, a, t, loopPeriod, handImg) {
   ctx.save();
   ctx.translate(a.x, a.y);
   ctx.rotate(deg2rad(a.rotation || 0));
-  ctx.translate(0, -poke); // poke along local "up" (finger direction)
+  
+  // Apply a -30 degree rotation before the poke translation, then rotate 30 degrees back!
+  // This ensures the poke animation moves exactly along the CapCut index finger's native tilt direction!
+  ctx.rotate(deg2rad(-30));
+  ctx.translate(0, -poke);
+  ctx.rotate(deg2rad(30));
+
   ctx.scale(s, s);
   // place so the fingertip anchor lands at the origin
   ctx.translate(-HAND_ANCHOR.x * HAND_VIEWBOX.w, -HAND_ANCHOR.y * HAND_VIEWBOX.h);

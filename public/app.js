@@ -1,12 +1,15 @@
 import { drawBase, drawAnnotations, DEFAULTS, HAND_BASE_HEIGHT } from "/shared/draw.js";
-import { HAND_VIEWBOX, HAND_ANCHOR, HAND_BBOX, buildHandDataURI } from "/shared/hand.js";
+import { HAND_VIEWBOX, HAND_ANCHOR, HAND_BBOX } from "/shared/hand.js";
 
 // ---------- state ----------
 let scene = null;
 let selImageId = null;
 let selAnnId = null;
 const baseImages = new Map(); // file -> HTMLImageElement (loaded)
-const handImages = new Map(); // hand colour -> { img, ready }
+const handImg = new Image();
+let handImgReady = false;
+handImg.onload = () => { handImgReady = true; };
+handImg.src = "/hand.png";
 let bgCanvas = document.createElement("canvas");
 let bgCtx = bgCanvas.getContext("2d");
 let bgKey = ""; // invalidation key for the cached background
@@ -129,26 +132,17 @@ function rebuildBgIfNeeded() {
   bgKey = key;
 }
 
-// ---------- hand sprite cache (recoloured SVG, loaded per colour) ----------
-function ensureHandImage(colour) {
-  const c = colour ?? DEFAULTS.hand.fill;
-  let entry = handImages.get(c);
-  if (!entry) {
-    entry = { img: new Image(), ready: false };
-    entry.img.onload = () => { entry.ready = true; };
-    entry.img.src = buildHandDataURI(c);
-    handImages.set(c, entry);
-  }
-  return entry;
-}
+// ---------- hand sprite cache (using static CapCut hand.png) ----------
 // build the { colour -> loaded image } map drawAnnotations expects
 function handImageMap(im) {
   const map = {};
-  for (const a of im.annotations) {
-    if (a.type !== "hand") continue;
-    const c = a.fill ?? DEFAULTS.hand.fill;
-    const entry = ensureHandImage(c);
-    if (entry.ready) map[c] = entry.img;
+  if (handImgReady) {
+    for (const a of im.annotations) {
+      if (a.type === "hand") {
+        const c = a.fill ?? DEFAULTS.hand.fill;
+        map[c] = handImg;
+      }
+    }
   }
   return map;
 }
@@ -350,6 +344,17 @@ function bindAnn(id, labelId, prop, unit, dp) {
   });
 }
 $("annColor").addEventListener("input", (e) => { const a = curAnn(); if (!a) return; if (a.type === "hand") a.fill = e.target.value; else a.stroke = e.target.value; markDirty(); });
+document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("preset-btn")) {
+    const color = e.target.dataset.color;
+    const a = curAnn();
+    if (!a) return;
+    if (a.type === "hand") a.fill = color;
+    else a.stroke = color;
+    $("annColor").value = color;
+    markDirty();
+  }
+});
 bindAnn("annRot", "rotVal", "rotation", "°");
 bindAnn("annScale", "scaleVal", "scale", "x", 2);
 bindAnn("annPoke", "pokeVal", "pokeDistance", "");
@@ -430,3 +435,21 @@ $("exportBtn").addEventListener("click", async () => {
   });
 });
 $("exportClose").addEventListener("click", () => $("exportOverlay").classList.add("hidden"));
+
+// ---------- WebSocket connection for auto-shutdown ----------
+function connectAutoShutdownWS() {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = `${protocol}//${window.location.host}`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onclose = () => {
+    // Try to reconnect in 3 seconds if disconnected
+    setTimeout(connectAutoShutdownWS, 3000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+}
+connectAutoShutdownWS();
+

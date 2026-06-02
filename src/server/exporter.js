@@ -6,9 +6,12 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { renderFrame, DEFAULTS } from "../shared/draw.js";
-import { buildHandSVG } from "../shared/hand.js";
+import { fileURLToPath } from "node:url";
 
-/** Pre-rasterise the recoloured hand sprite for every colour used in an image. */
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, "..", "..");
+
+/** Load the static CapCut hand PNG image from public/hand.png once. */
 async function loadHandImages(image) {
   const colours = new Set(
     (image.annotations || [])
@@ -16,7 +19,10 @@ async function loadHandImages(image) {
       .map((a) => a.fill ?? DEFAULTS.hand.fill)
   );
   const map = {};
-  for (const c of colours) map[c] = await loadImage(Buffer.from(buildHandSVG(c)));
+  if (colours.size > 0) {
+    const handImg = await loadImage(path.join(ROOT, "public", "hand.png"));
+    for (const c of colours) map[c] = handImg;
+  }
   return map;
 }
 

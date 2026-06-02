@@ -3,6 +3,8 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import open from "open";
+import { WebSocketServer } from "ws";
 import { loadOrInitProject, saveProject } from "./project.js";
 import { exportAll } from "./exporter.js";
 
@@ -60,6 +62,13 @@ export function startServer({ inputDir, outputDir, port = 4321 }) {
       const scene = loadOrInitProject(inputDir, outputDir);
       const results = await exportAll(scene, { onProgress: (p) => send("progress", p) });
       send("done", { results, outputDir });
+
+      // Automatically open output directory and shut down the server process
+      open(outputDir).catch(() => {});
+      setTimeout(() => {
+        console.log("[server] Export complete. Automatically shutting down server...");
+        process.exit(0);
+      }, 1500);
     } catch (e) {
       send("error", { message: e.message });
     } finally {
@@ -68,6 +77,36 @@ export function startServer({ inputDir, outputDir, port = 4321 }) {
   });
 
   const server = http.createServer(app);
+
+  // Set up WebSocket server for auto-shutdown when no browser clients are connected
+  const wss = new WebSocketServer({ server });
+  let activeConnections = 0;
+  let shutdownTimeout = null;
+
+  wss.on("connection", (ws) => {
+    activeConnections++;
+    if (shutdownTimeout) {
+      clearTimeout(shutdownTimeout);
+      shutdownTimeout = null;
+      console.log("[server] Browser client connected. Cancelled auto-shutdown.");
+    }
+
+    ws.on("close", () => {
+      activeConnections--;
+      if (activeConnections <= 0) {
+        console.log("[server] No active clients connected. Scheduling auto-shutdown in 5s...");
+        shutdownTimeout = setTimeout(() => {
+          console.log("[server] Auto-shutdown triggered (no clients connected). Exiting...");
+          process.exit(0);
+        }, 5000);
+      }
+    });
+
+    ws.on("error", () => {
+      // Quietly handle connection errors
+    });
+  });
+
   return new Promise((resolve, reject) => {
     server.on("error", reject);
     server.listen(port, () => resolve({ server, port, url: `http://localhost:${port}` }));
