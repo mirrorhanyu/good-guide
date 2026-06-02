@@ -2,12 +2,11 @@
 // context (preview) and an @napi-rs/canvas context (export) with identical
 // output. No runtime-specific APIs here; pre-loaded image objects are passed in.
 
-import { HAND_VIEWBOX, HAND_ANCHOR, drawHandShape } from "./hand.js";
+import { HAND_VIEWBOX, HAND_ANCHOR } from "./hand.js";
 import { phaseOf, pokeCurve, pulseScale } from "./anim.js";
 
-// Sprite base height (canvas px) at scale 1. Width follows the viewBox ratio.
-export const HAND_BASE_HEIGHT = 420;
-export const HAND_BASE_WIDTH = HAND_BASE_HEIGHT * (HAND_VIEWBOX.w / HAND_VIEWBOX.h);
+// Sprite base height (canvas px) at scale 1 (maps the full hand viewBox height).
+export const HAND_BASE_HEIGHT = 460;
 
 export const DEFAULTS = {
   canvas: { w: 1080, h: 1920 },
@@ -16,7 +15,7 @@ export const DEFAULTS = {
   loopPeriod: 1.3, // seconds per poke/pulse cycle
   background: { mode: "blur", color: "#101014", blur: 40, scrim: 0.35 },
   fit: "contain",
-  hand: { rotation: 0, scale: 1, fill: "#ffce9e", outline: "#6b4226", pokeDistance: 70 },
+  hand: { rotation: 0, scale: 1, fill: "#1b1b1f", pokeDistance: 70 },
   box: { rotation: 0, stroke: "#ff3b30", lineWidth: 10, radius: 24, pulse: 0.06 },
 };
 
@@ -104,8 +103,13 @@ export function drawBox(ctx, a, t, loopPeriod) {
   ctx.restore();
 }
 
-/** Draw one hand annotation (optionally animated), using native path drawing. */
-export function drawHand(ctx, a, t, loopPeriod) {
+/**
+ * Draw one hand annotation (optionally animated). `handImg` is the pre-loaded,
+ * recoloured hand sprite image for this annotation's colour. If it isn't ready
+ * yet the hand is simply skipped for this frame.
+ */
+export function drawHand(ctx, a, t, loopPeriod, handImg) {
+  if (!handImg) return;
   const ph = phaseOf(t, loopPeriod);
   const scale = a.scale ?? 1;
   const poke = (a.pokeDistance ?? DEFAULTS.hand.pokeDistance) * scale * pokeCurve(ph);
@@ -118,20 +122,23 @@ export function drawHand(ctx, a, t, loopPeriod) {
   ctx.scale(s, s);
   // place so the fingertip anchor lands at the origin
   ctx.translate(-HAND_ANCHOR.x * HAND_VIEWBOX.w, -HAND_ANCHOR.y * HAND_VIEWBOX.h);
-  drawHandShape(ctx, { fill: a.fill ?? DEFAULTS.hand.fill, outline: a.outline ?? DEFAULTS.hand.outline });
+  ctx.drawImage(handImg, 0, 0, HAND_VIEWBOX.w, HAND_VIEWBOX.h);
   ctx.restore();
 }
 
-/** Draw all annotations for an image at time t. */
-export function drawAnnotations(ctx, annotations, t, loopPeriod) {
+/**
+ * Draw all annotations for an image at time t.
+ * `handImages` maps a hand colour (annotation.fill) -> loaded sprite image.
+ */
+export function drawAnnotations(ctx, annotations, t, loopPeriod, handImages = {}) {
   for (const a of annotations || []) {
     if (a.type === "box") drawBox(ctx, a, t, loopPeriod);
-    else if (a.type === "hand") drawHand(ctx, a, t, loopPeriod);
+    else if (a.type === "hand") drawHand(ctx, a, t, loopPeriod, handImages[a.fill ?? DEFAULTS.hand.fill]);
   }
 }
 
 /** Full frame: base + annotations at time t. */
-export function renderFrame(ctx, scene, image, baseImg, t) {
+export function renderFrame(ctx, scene, image, baseImg, t, handImages = {}) {
   drawBase(ctx, baseImg, scene);
-  drawAnnotations(ctx, image.annotations, t, scene.loopPeriod ?? DEFAULTS.loopPeriod);
+  drawAnnotations(ctx, image.annotations, t, scene.loopPeriod ?? DEFAULTS.loopPeriod, handImages);
 }

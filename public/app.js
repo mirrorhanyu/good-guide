@@ -1,11 +1,12 @@
 import { drawBase, drawAnnotations, DEFAULTS, HAND_BASE_HEIGHT } from "/shared/draw.js";
-import { HAND_VIEWBOX, HAND_ANCHOR, HAND_BBOX } from "/shared/hand.js";
+import { HAND_VIEWBOX, HAND_ANCHOR, HAND_BBOX, buildHandDataURI } from "/shared/hand.js";
 
 // ---------- state ----------
 let scene = null;
 let selImageId = null;
 let selAnnId = null;
 const baseImages = new Map(); // file -> HTMLImageElement (loaded)
+const handImages = new Map(); // hand colour -> { img, ready }
 let bgCanvas = document.createElement("canvas");
 let bgCtx = bgCanvas.getContext("2d");
 let bgKey = ""; // invalidation key for the cached background
@@ -128,6 +129,30 @@ function rebuildBgIfNeeded() {
   bgKey = key;
 }
 
+// ---------- hand sprite cache (recoloured SVG, loaded per colour) ----------
+function ensureHandImage(colour) {
+  const c = colour ?? DEFAULTS.hand.fill;
+  let entry = handImages.get(c);
+  if (!entry) {
+    entry = { img: new Image(), ready: false };
+    entry.img.onload = () => { entry.ready = true; };
+    entry.img.src = buildHandDataURI(c);
+    handImages.set(c, entry);
+  }
+  return entry;
+}
+// build the { colour -> loaded image } map drawAnnotations expects
+function handImageMap(im) {
+  const map = {};
+  for (const a of im.annotations) {
+    if (a.type !== "hand") continue;
+    const c = a.fill ?? DEFAULTS.hand.fill;
+    const entry = ensureHandImage(c);
+    if (entry.ready) map[c] = entry.img;
+  }
+  return map;
+}
+
 // ---------- render loop ----------
 function loop() {
   requestAnimationFrame(loop);
@@ -137,7 +162,7 @@ function loop() {
   const t = (performance.now() - startTime) / 1000;
   ctx.clearRect(0, 0, stage.width, stage.height);
   ctx.drawImage(bgCanvas, 0, 0);
-  drawAnnotations(ctx, im.annotations, t, scene.loopPeriod ?? DEFAULTS.loopPeriod);
+  drawAnnotations(ctx, im.annotations, t, scene.loopPeriod ?? DEFAULTS.loopPeriod, handImageMap(im));
   drawSelection();
 }
 
@@ -255,7 +280,7 @@ function near(p, q, d) { return Math.hypot(p.x - q.x, p.y - q.y) <= d; }
 // ---------- add / delete ----------
 $("addHand").addEventListener("click", () => addAnn({
   id: uid(), type: "hand", x: scene.canvas.w / 2, y: scene.canvas.h / 2,
-  rotation: 0, scale: 1, fill: DEFAULTS.hand.fill, outline: DEFAULTS.hand.outline, pokeDistance: DEFAULTS.hand.pokeDistance,
+  rotation: 0, scale: 1, fill: DEFAULTS.hand.fill, pokeDistance: DEFAULTS.hand.pokeDistance,
 }));
 $("addBox").addEventListener("click", () => addAnn({
   id: uid(), type: "box", x: scene.canvas.w / 2, y: scene.canvas.h / 2,

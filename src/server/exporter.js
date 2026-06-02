@@ -5,7 +5,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { renderFrame } from "../shared/draw.js";
+import { renderFrame, DEFAULTS } from "../shared/draw.js";
+import { buildHandSVG } from "../shared/hand.js";
+
+/** Pre-rasterise the recoloured hand sprite for every colour used in an image. */
+async function loadHandImages(image) {
+  const colours = new Set(
+    (image.annotations || [])
+      .filter((a) => a.type === "hand")
+      .map((a) => a.fill ?? DEFAULTS.hand.fill)
+  );
+  const map = {};
+  for (const c of colours) map[c] = await loadImage(Buffer.from(buildHandSVG(c)));
+  return map;
+}
 
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
 
@@ -22,6 +35,7 @@ export async function exportImage(scene, image, { onFrame } = {}) {
   const frames = Math.max(1, Math.round((scene.duration || 5) * fps));
 
   const baseImg = await loadImage(path.join(scene.inputDir, image.file));
+  const handImages = await loadHandImages(image);
   const canvas = createCanvas(w, h);
   const ctx = canvas.getContext("2d");
 
@@ -62,7 +76,7 @@ export async function exportImage(scene, image, { onFrame } = {}) {
   try {
     for (let i = 0; i < frames; i++) {
       const t = i / fps;
-      renderFrame(ctx, scene, image, baseImg, t);
+      renderFrame(ctx, scene, image, baseImg, t, handImages);
       const { data } = ctx.getImageData(0, 0, w, h);
       const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
       if (!ff.stdin.write(buf)) {

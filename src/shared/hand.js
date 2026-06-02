@@ -1,83 +1,38 @@
-// Shared hand-sprite drawing. Uses only native Canvas2D path commands so it
-// renders identically in the browser (preview) and in Node via @napi-rs/canvas
-// (export).
-//
-// A "pointing up" hand: index finger extended, the other fingers folded into a
-// fist, thumb tucked on the side. Drawn as one continuous silhouette (fill +
-// outline) plus a few interior crease lines, so it reads as a real hand rather
-// than a blob. The fingertip sits at the top so callers use it as the anchor /
-// rotation pivot, and the poke animation slides the hand along its local "up".
+// Shared hand sprite. The artwork is a flat single-colour "pointing" icon
+// (provided as SVG). We rotate it -90° so the index finger points UP, recolour
+// it by swapping the single fill, and rasterise it: the browser loads it as an
+// Image via a data URI (preview), and Node loads the same markup as a Buffer
+// via @napi-rs/canvas (export) — so both runtimes render identically.
 
-export const HAND_VIEWBOX = { w: 200, h: 300 };
+export const HAND_VIEWBOX = { w: 32, h: 32 };
 
-// Fingertip apex inside the viewBox (anchor / pivot), as a ratio of the viewBox.
-export const HAND_ANCHOR = { x: 80 / HAND_VIEWBOX.w, y: 12 / HAND_VIEWBOX.h };
+// Fingertip apex (anchor / rotation pivot) in the upright viewBox, as a ratio.
+export const HAND_ANCHOR = { x: 12.97 / 32, y: 0 / 32 };
 
-// Actual drawn extents in viewBox units (used for selection bounds / hit-test).
-export const HAND_BBOX = { minx: 10, miny: 12, maxx: 172, maxy: 282 };
+// Drawn content extents (upright) in viewBox units, for selection bounds.
+export const HAND_BBOX = { minx: 6.6, miny: 0, maxx: 28.35, maxy: 31.95 };
 
-const STROKE_W = 6;
+// Original right-pointing path from the supplied SVG (viewBox 0 0 32).
+const HAND_PATH =
+  "M29,10H19c0-1.654-1.346-3-3-3h-5c-0.656,0-1.301,0.219-1.821,0.617L3.716,11H1" +
+  "c-0.552,0-1,0.448-1,1v12c0,0.552,0.448,1,1,1h2.687l2.972,2.069C7.247,27.613,8.214,28,9,28h9.848c1.582,0,3.006-1.16,3.141-2.737" +
+  "c0.054-0.633-0.089-1.229-0.375-1.735C22.446,22.995,23,22.061,23,21c0-0.535-0.141-1.037-0.387-1.472" +
+  "C23.446,18.995,24,18.061,24,17c0-0.351-0.061-0.687-0.171-1H29c1.657,0,3-1.343,3-3S30.657,10,29,10z M4,23H2V13h2V23z M29,14h-8" +
+  "c-0.552,0-1,0.448-1,1c0,0.552,0.448,1,1,1c0.552,0,1,0.449,1,1s-0.448,1-1,1h-1c-0.552,0-1,0.448-1,1c0,0.552,0.448,1,1,1" +
+  "c0.552,0,1,0.449,1,1s-0.448,1-1,1h-1c-0.552,0-1,0.448-1,1c0,0.552,0.448,1,1,1c0.552,0,1,0.449,1,1s-0.448,1-1,1H9" +
+  "c-0.285,0-0.799-0.213-1-0.414l-3-2.104V12.557l5.277-3.268C10.277,9.289,10.774,9,11,9h5c0.552,0,1,0.449,1,1c0,0.168,0,1,0,1h-4" +
+  "c-0.276,0-0.5,0.224-0.5,0.5c0,0.276,0.224,0.5,0.5,0.5h16c0.552,0,1,0.448,1,1C30,13.552,29.552,14,29,14z";
 
-function handOutline(ctx) {
-  // start at the web between thumb and index
-  ctx.moveTo(62, 150);
-  // up the left side of the index finger
-  ctx.lineTo(62, 44);
-  // round the fingertip
-  ctx.quadraticCurveTo(62, 12, 80, 12);
-  ctx.quadraticCurveTo(98, 12, 98, 44);
-  // down the right side of the index to the knuckle
-  ctx.lineTo(98, 132);
-  // over the folded-finger knuckles (back of hand)
-  ctx.bezierCurveTo(112, 118, 150, 120, 166, 152);
-  // right side of the fist
-  ctx.bezierCurveTo(174, 178, 172, 214, 160, 240);
-  // bottom-right down to the wrist
-  ctx.quadraticCurveTo(150, 264, 122, 274);
-  // wrist / cuff bottom edge
-  ctx.quadraticCurveTo(86, 286, 56, 270);
-  // up the left side of the palm toward the thumb
-  ctx.bezierCurveTo(46, 254, 42, 226, 41, 206);
-  // thumb: bulge out and up to the tip
-  ctx.bezierCurveTo(30, 198, 14, 188, 12, 168);
-  ctx.bezierCurveTo(11, 152, 24, 150, 38, 158);
-  // back up to the thumb/index web
-  ctx.bezierCurveTo(48, 150, 54, 150, 62, 150);
-  ctx.closePath();
+// Rasterise at this pixel size so up-scaling onto the canvas stays crisp.
+const RASTER = 1024;
+
+/** Build the upright, recoloured hand SVG markup. */
+export function buildHandSVG(fill = "#1b1b1f") {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${RASTER}" height="${RASTER}" viewBox="0 0 32 32">` +
+    `<g transform="rotate(-90 16 16)"><path d="${HAND_PATH}" fill="${fill}"/></g></svg>`;
 }
 
-function creases(ctx, outline) {
-  ctx.save();
-  ctx.strokeStyle = outline;
-  ctx.globalAlpha = 0.4;
-  ctx.lineWidth = 3.5;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  // folded-finger seams on the back of the hand
-  ctx.moveTo(112, 126); ctx.quadraticCurveTo(120, 150, 118, 178);
-  ctx.moveTo(134, 124); ctx.quadraticCurveTo(144, 150, 142, 182);
-  ctx.moveTo(154, 132); ctx.quadraticCurveTo(164, 156, 162, 186);
-  // thumb crease
-  ctx.moveTo(44, 168); ctx.quadraticCurveTo(58, 176, 64, 192);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/**
- * Draw the hand in viewBox coordinates (0..200 x, 0..300 y). The caller sets
- * translate/rotate/scale and anchor placement. Colours are configurable.
- */
-export function drawHandShape(ctx, { fill = "#ffce9e", outline = "#6b4226" } = {}) {
-  ctx.save();
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  handOutline(ctx);
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.lineWidth = STROKE_W;
-  ctx.strokeStyle = outline;
-  ctx.stroke();
-  creases(ctx, outline);
-  ctx.restore();
+/** data: URI form, loadable as an Image in the browser. */
+export function buildHandDataURI(fill) {
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(buildHandSVG(fill));
 }
